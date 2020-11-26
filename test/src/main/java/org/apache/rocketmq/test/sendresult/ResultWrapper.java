@@ -24,6 +24,7 @@ public class ResultWrapper {
     private String brokerIp = null;
 
     public String getBrokerIp() {
+
         return brokerIp;
     }
 
