@@ -17,6 +17,13 @@
 package org.apache.rocketmq.remoting.protocol;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.CommandCustomHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -24,13 +31,20 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.rocketmq.remoting.CommandCustomHeader;
-import org.apache.rocketmq.remoting.annotation.CFNotNull;
-import org.apache.rocketmq.remoting.common.RemotingHelper;
-import org.apache.rocketmq.remoting.exception.RemotingCommandException;
-import org.apache.rocketmq.logging.InternalLogger;
-import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * 消息的协议设计与编码解码
+ * 在Client和Server之间完成一次消息发送时，需要对发送的消息进行一个协议约定，因此就有必要自定义RocketMQ的消息协议，
+ * 同时，为了高效地在网络中传输消息和对收到的消息读取，就需要对消息进行编解码。
+ * <p>
+ * 在RocketMQ中，RemotingCommand这个类在消息传输过程中对所有数据内容的封装，不但包含了所有的数据结构，还包含了编码解码操作。
+ * decode和encode
+ * RocketMQ通信协议的格式：【4部分】
+ * 消息长度： 总长度，四个字节存储，占用一个int类型；
+ * 序列化类型和消息头长度：同样占用一个int类型，第一个字节表示序列化类型，后面三个字节表示消息头长度；
+ * 消息头数据：经过序列化后的消息头数据；
+ * 消息主体数据：消息主体的二进制字节数据内容
+ */
 public class RemotingCommand {
     public static final String SERIALIZE_TYPE_PROPERTY = "rocketmq.serialize.type";
     public static final String SERIALIZE_TYPE_ENV = "ROCKETMQ_SERIALIZE_TYPE";
@@ -39,7 +53,7 @@ public class RemotingCommand {
     private static final int RPC_TYPE = 0; // 0, REQUEST_COMMAND
     private static final int RPC_ONEWAY = 1; // 0, RPC
     private static final Map<Class<? extends CommandCustomHeader>, Field[]> CLASS_HASH_MAP =
-        new HashMap<Class<? extends CommandCustomHeader>, Field[]>();
+            new HashMap<Class<? extends CommandCustomHeader>, Field[]>();
     private static final Map<Class, String> CANONICAL_NAME_CACHE = new HashMap<Class, String>();
     // 1, Oneway
     // 1, RESPONSE_COMMAND
@@ -69,6 +83,9 @@ public class RemotingCommand {
         }
     }
 
+    /**
+     * 这是消息头的数据
+     */
     private int code;
     private LanguageCode language = LanguageCode.JAVA;
     private int version = 0;
@@ -111,7 +128,7 @@ public class RemotingCommand {
     }
 
     public static RemotingCommand createResponseCommand(int code, String remark,
-        Class<? extends CommandCustomHeader> classHeader) {
+                                                        Class<? extends CommandCustomHeader> classHeader) {
         RemotingCommand cmd = new RemotingCommand();
         cmd.markResponseType();
         cmd.setCode(code);
@@ -136,6 +153,12 @@ public class RemotingCommand {
         return createResponseCommand(code, remark, null);
     }
 
+    /**
+     * decode 为消息解码
+     *
+     * @param array
+     * @return
+     */
     public static RemotingCommand decode(final byte[] array) {
         ByteBuffer byteBuffer = ByteBuffer.wrap(array);
         return decode(byteBuffer);
@@ -232,7 +255,7 @@ public class RemotingCommand {
     }
 
     public CommandCustomHeader decodeCommandCustomHeader(
-        Class<? extends CommandCustomHeader> classHeader) throws RemotingCommandException {
+            Class<? extends CommandCustomHeader> classHeader) throws RemotingCommandException {
         CommandCustomHeader objectHeader;
         try {
             objectHeader = classHeader.newInstance();
@@ -325,6 +348,11 @@ public class RemotingCommand {
         return name;
     }
 
+    /**
+     * 消息的编码
+     *
+     * @return
+     */
     public ByteBuffer encode() {
         // 1> header length size
         int length = 4;
@@ -529,8 +557,8 @@ public class RemotingCommand {
     @Override
     public String toString() {
         return "RemotingCommand [code=" + code + ", language=" + language + ", version=" + version + ", opaque=" + opaque + ", flag(B)="
-            + Integer.toBinaryString(flag) + ", remark=" + remark + ", extFields=" + extFields + ", serializeTypeCurrentRPC="
-            + serializeTypeCurrentRPC + "]";
+                + Integer.toBinaryString(flag) + ", remark=" + remark + ", extFields=" + extFields + ", serializeTypeCurrentRPC="
+                + serializeTypeCurrentRPC + "]";
     }
 
     public SerializeType getSerializeTypeCurrentRPC() {

@@ -17,6 +17,9 @@
 
 package org.apache.rocketmq.remoting;
 
+/**
+ * RemotingService：为最上层的接口，提供了三个方法：
+ */
 public interface RemotingService {
     void start();
 
